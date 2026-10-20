@@ -60,6 +60,7 @@ func (s *sessionService) AgentQA(
 	// Propagate the session ID so stateful sandbox backends (CubeSandbox) can
 	// bind script execution to a per-session MicroVM instance.
 	ctx = types.WithSessionID(ctx, sessionID)
+	ctx = types.WithRunMode(ctx, req.Mode)
 	sessionJSON, err := json.Marshal(req.Session)
 	if err != nil {
 		logger.Errorf(ctx, "Failed to marshal session, session ID: %s, error: %v", sessionID, err)
@@ -102,6 +103,24 @@ func (s *sessionService) AgentQA(
 	agentConfig, err := s.buildAgentConfig(ctx, req, tenantInfo, agentTenantID)
 	if err != nil {
 		return err
+	}
+	if delegated, err := delegatedConfigFromBinding(ctx); err != nil {
+		return err
+	} else if delegated != nil {
+		agentConfig.AssistantAccess = delegated.level(tenantInfo)
+		if agentConfig.AssistantAccess == types.AssistantAccessReadOnly {
+			agentConfig.WritableKBIDs = nil
+		}
+	}
+	ctx = types.WithAccessLevel(ctx, agentConfig.AssistantAccess)
+	if _, scoped := types.GrantScopeFromContext(ctx); !scoped {
+		// Grants given anywhere in a conversation, including by its delegated
+		// children, belong to the root conversation.
+		grantSessionID := req.GrantSessionID
+		if grantSessionID == "" {
+			grantSessionID = sessionID
+		}
+		ctx = types.WithGrantScope(ctx, types.GrantScope{Scope: types.AgentGrantScopeSession, ScopeID: grantSessionID})
 	}
 
 	// Set VLM model ID for tool result image analysis (runtime-only field)
@@ -322,7 +341,12 @@ func (s *sessionService) AgentQA(
 		engine.SetSteerSink(req.SteerSink)
 	}
 
-	engine.SetInteractive(req.Interactive)
+	engine.SetRunMode(req.Mode)
+	if req.RunNote != "" {
+		if noted, ok := engine.(interface{ SetRunNote(string) }); ok {
+			noted.SetRunNote(req.RunNote)
+		}
+	}
 	collaborating := false
 	if bound, ok := engine.(interface{ HasCollaboration() bool }); ok {
 		collaborating = bound.HasCollaboration()
@@ -464,7 +488,7 @@ func (s *sessionService) buildAgentConfig(
 		MaxCompletionTokens:           customAgent.Config.MaxCompletionTokens,
 		RetainRetrievalHistory:        customAgent.Config.RetainRetrievalHistory,
 		SharedAgentReadOnly:           req.SharedAgentReadOnly,
-		AssistantAccess:               tenantInfo.AssistantConfig.EffectiveAccessLevel(req.AssistantAccess),
+		AssistantAccess:               types.CapAccessLevel(req.AssistantAccess, customAgent.Config.AccessLevel),
 		// The model is always told it may call tools in parallel; without
 		// this the engine still ran them one by one, so three searches in
 		// one reply cost three sequential embed/retrieve/rerank rounds.
@@ -586,10 +610,10 @@ func (s *sessionService) buildAgentConfig(
 			if cfg := tenantInfo.AssistantConfig; cfg != nil {
 				agentConfig.AssistantName = strings.TrimSpace(cfg.DisplayName)
 			}
-			if agentConfig.AssistantAccess == types.AssistantAccessReadOnly {
-				// Wiki tools write outside the catalog; read-only covers them too.
-				agentConfig.WritableKBIDs = nil
-			}
+		}
+		if agentConfig.AssistantAccess == types.AssistantAccessReadOnly {
+			// Wiki tools write outside the catalog; read-only covers them too.
+			agentConfig.WritableKBIDs = nil
 		}
 	}
 	agentConfig.QuestionOrigin = questionOriginInTargets(ctx, req.QuestionOrigin, searchTargets)
