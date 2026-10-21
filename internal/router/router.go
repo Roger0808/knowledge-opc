@@ -82,6 +82,8 @@ type RouterParams struct {
 	CustomAgentHandler           *handler.CustomAgentHandler
 	UserFavoriteHandler          *handler.UserResourceFavoriteHandler
 	SkillHandler                 *handler.SkillHandler
+	SkillReleaseHandler          *handler.SkillReleaseHandler
+	MCPInvocationHandler         *handler.MCPInvocationHandler
 	OrganizationHandler          *handler.OrganizationHandler
 	IMHandler                    *handler.IMHandler
 	EmbedChannelHandler          *handler.EmbedChannelHandler
@@ -322,7 +324,9 @@ func NewRouter(params RouterParams) *gin.Engine {
 		RegisterStorageBackendRoutes(v1, params.StorageBackendHandler, rbacGuards)
 		RegisterCustomAgentRoutes(v1, params.CustomAgentHandler, rbacGuards)
 		RegisterUserFavoriteRoutes(v1, params.UserFavoriteHandler, rbacGuards)
-		RegisterSkillRoutes(v1, params.SkillHandler, rbacGuards)
+		RegisterSkillRoutes(v1, params.SkillHandler, params.SkillReleaseHandler, rbacGuards)
+		RegisterSkillReleaseRoutes(v1, params.SkillReleaseHandler, rbacGuards)
+		RegisterIntegrationRoutes(v1, params.MCPInvocationHandler, rbacGuards)
 		RegisterOrganizationRoutes(v1, params.OrganizationHandler, rbacGuards)
 		RegisterIMChannelRoutes(v1, params.IMHandler, rbacGuards)
 		RegisterEmbedChannelRoutes(v1, params.EmbedChannelHandler, rbacGuards)

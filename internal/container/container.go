@@ -188,6 +188,7 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Provide(repository.NewMCPOAuthRepository))
 	must(container.Provide(repository.NewTenantSandboxConfigRepository))
 	must(container.Provide(repository.NewTenantSkillRepository))
+	must(container.Provide(repository.NewSkillReleaseRepository))
 	must(container.Provide(repository.NewCustomAgentRepository))
 	must(container.Provide(repository.NewOrganizationRepository))
 	must(container.Provide(repository.NewKBShareRepository))
@@ -290,6 +291,28 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Provide(service.NewMessageSuggestionService))
 	must(container.Provide(service.NewMCPServiceService))
 	must(container.Provide(service.NewMCPToolApprovalService))
+	// EXT-002 request-level MCP invocations (TASK-K04/K05): repository,
+	// service and handler. The executor routes through the shared MCP manager
+	// so connection reuse and the stdio ban stay in force.
+	must(container.Provide(repository.NewMCPInvocationRepository))
+	must(container.Provide(func(m *mcp.MCPManager) service.MCPInvocationExecutor {
+		return service.NewManagerMCPInvocationExecutor(m)
+	}))
+	must(container.Provide(func(
+		cfg *config.Config,
+		invocations repository.MCPInvocationRepository,
+		mcpServices interfaces.MCPServiceRepository,
+		toolApprovals interfaces.MCPToolApprovalService,
+		oauth interfaces.MCPOAuthRepository,
+		executor service.MCPInvocationExecutor,
+	) *service.MCPInvocationService {
+		var integration *config.IntegrationConfig
+		if cfg != nil {
+			integration = cfg.Integration
+		}
+		return service.NewMCPInvocationService(invocations, mcpServices, toolApprovals, oauth, executor, integration)
+	}))
+	must(container.Provide(handler.NewMCPInvocationHandler))
 	must(container.Provide(service.NewCustomAgentService))
 	must(container.Provide(service.NewUserResourceFavoriteService))
 	must(container.Provide(service.NewWikiPageService))
@@ -379,7 +402,31 @@ func BuildContainer(container *dig.Container) *dig.Container {
 
 	logger.Debugf(ctx, "[Container] Registering session service...")
 	must(container.Provide(service.NewSessionService))
-	must(container.Provide(service.NewTenantSkillService))
+	must(container.Provide(func(
+		skillsRepo repository.TenantSkillRepository,
+		configsRepo repository.TenantSandboxConfigRepository,
+		resolver interfaces.StorageBackendResolver,
+		sandboxes sandbox.TenantSandboxResolver,
+		sandboxPolicy service.WorkspaceSandboxPolicy,
+		agents interfaces.AgentService,
+		customAgents interfaces.CustomAgentService,
+		sessions interfaces.SessionService,
+		models interfaces.ModelService,
+		redisClient *redis.Client,
+		streams interfaces.StreamManager,
+		messages interfaces.MessageRepository,
+		host service.HostSandboxManager,
+		releaseRepo repository.SkillReleaseRepository,
+	) *service.TenantSkillService {
+		svc := service.NewTenantSkillService(
+			skillsRepo, configsRepo, resolver, sandboxes, sandboxPolicy, agents,
+			customAgents, sessions, models, redisClient, streams, messages, host,
+		)
+		// DeleteCatalog refuses to drop archive bytes a published release
+		// still references (EXT-001).
+		svc.SetSkillReleaseRepository(releaseRepo)
+		return svc
+	}))
 	// The member-facing half of env vars is its own service because its
 	// authority is different in kind: it derives the identity from the context
 	// and touches only that identity's rows.
@@ -665,6 +712,10 @@ func BuildContainer(container *dig.Container) *dig.Container {
 		s *service.TenantSkillService, agents interfaces.AgentShareService,
 	) *handler.SkillHandler {
 		return handler.NewSkillHandler(s, s, agents)
+	}))
+	must(container.Provide(service.NewSkillReleaseService))
+	must(container.Provide(func(releases *service.SkillReleaseService) *handler.SkillReleaseHandler {
+		return handler.NewSkillReleaseHandler(releases)
 	}))
 	must(container.Provide(handler.NewOrganizationHandler))
 	must(container.Provide(handler.NewMemoryHandler))

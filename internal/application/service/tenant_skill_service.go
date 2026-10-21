@@ -117,6 +117,19 @@ type TenantSkillService struct {
 	// nothing to cancel, and StopSkill then only rewrites the stuck row.
 	runCancelMu sync.Mutex
 	runCancels  map[string]*skillRunCancel
+
+	// skillReleases is the publication ledger (EXT-001) DeleteCatalog
+	// consults to refuse dropping archive bytes a published release still
+	// references. Nil keeps the guard off (unit tests of the install flows).
+	skillReleases repository.SkillReleaseRepository
+}
+
+// SetSkillReleaseRepository wires the publication ledger consulted by
+// DeleteCatalog. It is a setter (not a constructor parameter) so the many
+// existing test fixtures that build the service without releases keep
+// compiling; production wiring in the container always calls it.
+func (s *TenantSkillService) SetSkillReleaseRepository(releases repository.SkillReleaseRepository) {
+	s.skillReleases = releases
 }
 
 // NewTenantSkillService wires the repositories and runtimes the install and

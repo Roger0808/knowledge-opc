@@ -78,7 +78,7 @@ func RegisterUserFavoriteRoutes(r *gin.RouterGroup, h *handler.UserResourceFavor
 // PR 2 currently only exposes a read-only `ListSkills`; gated to
 // Viewer+. Future skill upload / enable endpoints must use Admin+ since
 // skills run sandboxed code on tenant resources.
-func RegisterSkillRoutes(r *gin.RouterGroup, skillHandler *handler.SkillHandler, g *rbacGuards) {
+func RegisterSkillRoutes(r *gin.RouterGroup, skillHandler *handler.SkillHandler, skillReleaseHandler *handler.SkillReleaseHandler, g *rbacGuards) {
 	skills := r.Group("/skills")
 	{
 		// Usable skills for @ mention / chat — Viewer+
@@ -95,6 +95,26 @@ func RegisterSkillRoutes(r *gin.RouterGroup, skillHandler *handler.SkillHandler,
 		catalogWrite.GET("/:id/files", g.Admin(), skillHandler.ListCatalogFiles)
 		catalogWrite.GET("/:id/files/content", g.Admin(), skillHandler.GetCatalogFile)
 		catalogWrite.DELETE("/:id", g.Admin(), skillHandler.DeleteCatalog)
+		// Publishing attests the stored archive into an immutable release
+		// record (EXT-001). Admin+ in the source workspace, same as the other
+		// catalog writes it reads the bytes from.
+		catalogWrite.POST("/:id/publish", g.Admin(), skillReleaseHandler.PublishCatalogRelease)
+	}
+}
+
+// RegisterSkillReleaseRoutes registers the skill release read/download/delist
+// routes (EXT-001). Reads are Viewer+; delisting is Admin+ in the source
+// workspace (the service re-checks ownership and answers 404 elsewhere).
+func RegisterSkillReleaseRoutes(r *gin.RouterGroup, h *handler.SkillReleaseHandler, g *rbacGuards) {
+	if h == nil {
+		return
+	}
+	releases := g.apiKeyGroup(r.Group("/skills/releases"), apiKeyFullAccess())
+	{
+		releases.GET("", g.Viewer(), h.ListSkillReleases)
+		releases.GET("/:id", g.Viewer(), h.GetSkillRelease)
+		releases.GET("/:id/archive", g.Viewer(), h.GetSkillReleaseArchive)
+		releases.POST("/:id/delist", g.Admin(), h.DelistSkillRelease)
 	}
 }
 

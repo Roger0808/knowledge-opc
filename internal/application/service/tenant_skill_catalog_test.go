@@ -119,6 +119,43 @@ func TestDeleteCatalogRefusesWhileARemovalIsInFlight(t *testing.T) {
 	require.Equal(t, 409, appErr.HTTPCode)
 }
 
+func TestDeleteCatalogRefusesWhileAPublishedReleaseReferencesTheBundle(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file:catalog-release-guard?mode=memory&cache=shared"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(
+		&types.TenantSkillEntity{}, &types.TenantSkillCatalogEntity{},
+		&types.TenantSkillSnapshotEntity{}, &types.TenantUserEnvVar{},
+		&types.SkillReleaseEntity{},
+	))
+	repo := repository.NewTenantSkillRepository(db)
+	releases := repository.NewSkillReleaseRepository(db)
+	ctx := context.Background()
+	ref := "local://7/tenant-skills/catalog/cat-pdf.zip"
+	require.NoError(t, repo.CreateCatalog(ctx, &types.TenantSkillCatalogEntity{
+		ID: "cat-pdf", TenantID: 7, Name: "pdf", BundleRef: ref,
+	}))
+	// A legacy release row (published before releases copied their bytes under
+	// their own immutable keys) still names the catalog object.
+	require.NoError(t, releases.CreateSkillRelease(ctx, &types.SkillReleaseEntity{
+		ID: "rel-1", TenantID: 7, CatalogID: "cat-pdf", Version: "1.0.0",
+		BundleSHA256: strings.Repeat("a", 64), ArchiveRef: ref,
+		Status: types.SkillReleaseStatusPublished,
+	}))
+
+	svc := NewTenantSkillService(repo, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, HostSandboxManager{})
+	svc.SetSkillReleaseRepository(releases)
+	err = svc.DeleteCatalog(ctx, 7, "cat-pdf")
+	require.Error(t, err)
+	appErr, ok := apperrors.IsAppError(err)
+	require.True(t, ok)
+	require.Equal(t, 409, appErr.HTTPCode)
+
+	// A delisted release no longer serves downloads, so it stops holding the
+	// object and the delete proceeds.
+	require.NoError(t, releases.UpdateSkillReleaseStatus(ctx, "rel-1", types.SkillReleaseStatusDelisted, nil))
+	require.NoError(t, svc.DeleteCatalog(ctx, 7, "cat-pdf"))
+}
+
 func TestInstallSkillStoresTheArchiveOnTheCatalog(t *testing.T) {
 	fx := newInstallFixture(t)
 	ctx := context.Background()

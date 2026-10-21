@@ -287,7 +287,8 @@ func (s *TenantSkillService) InstallCatalogToConfigs(
 }
 
 // DeleteCatalog removes a definition that has no remaining installations
-// and drops the stored zip. Sandbox uninstalls never delete that zip.
+// and drops the stored zip. Sandbox uninstalls never delete that zip, and
+// neither does this while a published release still references the object.
 func (s *TenantSkillService) DeleteCatalog(
 	ctx context.Context, tenantID uint64, catalogID string,
 ) error {
@@ -310,6 +311,20 @@ func (s *TenantSkillService) DeleteCatalog(
 			"remove this skill from every sandbox before deleting it from the catalog")
 	}
 	ref := strings.TrimSpace(catalog.BundleRef)
+	if ref != "" && s.skillReleases != nil {
+		// A published release that still names this object keeps serving its
+		// bytes (legacy rows published before releases copied their bytes under
+		// their own immutable keys); dropping the object would break its
+		// downloads. Delisted releases no longer serve and do not hold the ref.
+		held, err := s.skillReleases.CountPublishedReleasesByArchiveRef(ctx, ref)
+		if err != nil {
+			return err
+		}
+		if held > 0 {
+			return apperrors.NewConflictError(
+				"this skill's stored archive is still referenced by a published release; delist the release first")
+		}
+	}
 	if err := s.skills.DeleteCatalog(ctx, tenantID, catalogID); err != nil {
 		return err
 	}

@@ -34,6 +34,11 @@ type Config struct {
 	PromptTemplates *PromptTemplatesConfig `yaml:"prompt_templates" json:"prompt_templates"`
 	IM              *IMConfig              `yaml:"im"               json:"im"`
 	Agent           *AgentConfig           `yaml:"agent"            json:"agent"`
+	// Integration carries the EXT-002 request-level MCP invocation surface
+	// settings: the platform context signing key, the argument-encryption key
+	// and the waiting/execution timeouts. All secrets may also come from the
+	// WEKNORA_INTEGRATION_* env overrides; nothing is hard-coded.
+	Integration *IntegrationConfig `yaml:"integration"      json:"integration"`
 	// FrontendBaseURL is the externally-visible origin of the SPA, used
 	// to compose absolute share-link URLs. Empty falls back to a host-
 	// relative URL ("/register?token=…") which the SPA then resolves
@@ -91,6 +96,168 @@ func (c *AgentConfig) PromptExpiry() time.Duration {
 		return 0
 	default:
 		return time.Duration(c.PromptExpireSeconds) * time.Second
+	}
+}
+
+// Defaults for the EXT-002 integration invocation surface.
+const (
+	// DefaultIntegrationContextMaxAge bounds the freshness of the
+	// platform-signed invocation context JWT (120 seconds).
+	DefaultIntegrationContextMaxAge = 120 * time.Second
+	// DefaultIntegrationWriteTimeout bounds one mutating MCP tool call before
+	// its outcome is declared unknown (60 seconds).
+	DefaultIntegrationWriteTimeout = 60 * time.Second
+	// DefaultIntegrationApprovalLease is how long a waiting_approval
+	// invocation waits for its decision (15 minutes).
+	DefaultIntegrationApprovalLease = 15 * time.Minute
+	// DefaultIntegrationOAuthTimeout is how long a waiting_oauth invocation
+	// waits for its principal to authorize (10 minutes).
+	DefaultIntegrationOAuthTimeout = 10 * time.Minute
+	// DefaultIntegrationResultTTL is how long a terminal result stays
+	// readable before only the status remains (7 days).
+	DefaultIntegrationResultTTL = 7 * 24 * time.Hour
+	// DefaultIntegrationReadSweepTimeout is the crash-sweep window for
+	// read-only invocations (they have no execution deadline).
+	DefaultIntegrationReadSweepTimeout = 30 * time.Minute
+)
+
+// IntegrationConfig carries the EXT-002 request-level MCP invocation
+// settings. Keys are injected here (config file or WEKNORA_INTEGRATION_*
+// env overrides); no secret is hard-coded. An empty ContextKey or
+// ContextAudience rejects every invocation until an operator provisions
+// them (fail-closed).
+type IntegrationConfig struct {
+	// ContextKey is the HMAC key the platform signs invocation context JWTs
+	// with. Env: WEKNORA_INTEGRATION_CONTEXT_KEY.
+	ContextKey string `yaml:"context_key" json:"-"`
+	// ContextAudience is the required aud claim of an invocation context.
+	// Env: WEKNORA_INTEGRATION_CONTEXT_AUDIENCE.
+	ContextAudience string `yaml:"context_audience" json:"context_audience"`
+	// ContextMaxAgeSeconds caps context JWT lifetime (default 120).
+	ContextMaxAgeSeconds int `yaml:"context_max_age_seconds" json:"context_max_age_seconds"`
+	// ArgsKey seals stored invocation arguments (AES-256-GCM). Accepts a
+	// raw passphrase or a base64/hex encoded 32-byte key.
+	// Env: WEKNORA_INTEGRATION_ARGS_KEY.
+	ArgsKey string `yaml:"args_key" json:"-"`
+	// WriteTimeoutSeconds bounds mutating MCP calls (default 60).
+	WriteTimeoutSeconds int `yaml:"write_timeout_seconds" json:"write_timeout_seconds"`
+	// ApprovalLeaseSeconds is the waiting_approval lease (default 900).
+	ApprovalLeaseSeconds int `yaml:"approval_lease_seconds" json:"approval_lease_seconds"`
+	// OAuthTimeoutSeconds is the waiting_oauth lease (default 600).
+	OAuthTimeoutSeconds int `yaml:"oauth_timeout_seconds" json:"oauth_timeout_seconds"`
+	// ResultTTLDays is how long results stay queryable (default 7).
+	ResultTTLDays int `yaml:"result_ttl_days" json:"result_ttl_days"`
+	// ReadSweepSeconds is the crash-sweep window for read-only invocations
+	// (default 1800). Reads carry no execution deadline, so the sweep must not
+	// settle a slow-but-alive read at the write window.
+	ReadSweepSeconds int `yaml:"read_sweep_seconds" json:"read_sweep_seconds"`
+}
+
+// contextMaxAge returns the configured context freshness bound.
+func (c *IntegrationConfig) ContextMaxAge() time.Duration {
+	if c == nil || c.ContextMaxAgeSeconds <= 0 {
+		return DefaultIntegrationContextMaxAge
+	}
+	return time.Duration(c.ContextMaxAgeSeconds) * time.Second
+}
+
+// writeTimeout returns the mutating-call bound.
+func (c *IntegrationConfig) WriteTimeout() time.Duration {
+	if c == nil || c.WriteTimeoutSeconds <= 0 {
+		return DefaultIntegrationWriteTimeout
+	}
+	return time.Duration(c.WriteTimeoutSeconds) * time.Second
+}
+
+// approvalLease returns the waiting_approval lease.
+func (c *IntegrationConfig) ApprovalLease() time.Duration {
+	if c == nil || c.ApprovalLeaseSeconds <= 0 {
+		return DefaultIntegrationApprovalLease
+	}
+	return time.Duration(c.ApprovalLeaseSeconds) * time.Second
+}
+
+// oauthTimeout returns the waiting_oauth lease.
+func (c *IntegrationConfig) OAuthTimeout() time.Duration {
+	if c == nil || c.OAuthTimeoutSeconds <= 0 {
+		return DefaultIntegrationOAuthTimeout
+	}
+	return time.Duration(c.OAuthTimeoutSeconds) * time.Second
+}
+
+// resultTTL returns how long a terminal result stays readable.
+func (c *IntegrationConfig) ResultTTL() time.Duration {
+	if c == nil || c.ResultTTLDays <= 0 {
+		return DefaultIntegrationResultTTL
+	}
+	return time.Duration(c.ResultTTLDays) * 24 * time.Hour
+}
+
+// ReadSweepTimeout returns the crash-sweep window for read-only invocations.
+func (c *IntegrationConfig) ReadSweepTimeout() time.Duration {
+	if c == nil || c.ReadSweepSeconds <= 0 {
+		return DefaultIntegrationReadSweepTimeout
+	}
+	return time.Duration(c.ReadSweepSeconds) * time.Second
+}
+
+// audience returns the required invocation-context audience.
+func (c *IntegrationConfig) Audience() string {
+	if c == nil {
+		return ""
+	}
+	return strings.TrimSpace(c.ContextAudience)
+}
+
+// applyIntegrationDefaults fills zero values and applies the
+// WEKNORA_INTEGRATION_* env overrides. Secrets are NOT defaulted: without an
+// operator-provided context key every invocation is rejected, and without an
+// ArgsKey invocation arguments are never persisted (only their digest is
+// stored).
+func applyIntegrationDefaults(cfg *Config) {
+	if cfg.Integration == nil {
+		cfg.Integration = &IntegrationConfig{}
+	}
+	integration := cfg.Integration
+	if value := strings.TrimSpace(os.Getenv("WEKNORA_INTEGRATION_CONTEXT_KEY")); value != "" {
+		integration.ContextKey = value
+	}
+	if value := strings.TrimSpace(os.Getenv("WEKNORA_INTEGRATION_CONTEXT_AUDIENCE")); value != "" {
+		integration.ContextAudience = value
+	}
+	if value := strings.TrimSpace(os.Getenv("WEKNORA_INTEGRATION_ARGS_KEY")); value != "" {
+		integration.ArgsKey = value
+	}
+	if value := strings.TrimSpace(os.Getenv("WEKNORA_INTEGRATION_WRITE_TIMEOUT")); value != "" {
+		if d, err := time.ParseDuration(value); err == nil && d > 0 {
+			integration.WriteTimeoutSeconds = int(d.Seconds())
+		} else if sec, err := strconv.Atoi(value); err == nil && sec > 0 {
+			integration.WriteTimeoutSeconds = sec
+		}
+	}
+	if value := strings.TrimSpace(os.Getenv("WEKNORA_INTEGRATION_APPROVAL_LEASE")); value != "" {
+		if d, err := time.ParseDuration(value); err == nil && d > 0 {
+			integration.ApprovalLeaseSeconds = int(d.Seconds())
+		} else if sec, err := strconv.Atoi(value); err == nil && sec > 0 {
+			integration.ApprovalLeaseSeconds = sec
+		}
+	}
+	if value := strings.TrimSpace(os.Getenv("WEKNORA_INTEGRATION_OAUTH_TIMEOUT")); value != "" {
+		if d, err := time.ParseDuration(value); err == nil && d > 0 {
+			integration.OAuthTimeoutSeconds = int(d.Seconds())
+		} else if sec, err := strconv.Atoi(value); err == nil && sec > 0 {
+			integration.OAuthTimeoutSeconds = sec
+		}
+	}
+	if value := strings.TrimSpace(os.Getenv("WEKNORA_INTEGRATION_RESULT_TTL")); value != "" {
+		if d, err := time.ParseDuration(value); err == nil && d > 0 {
+			integration.ResultTTLDays = int(d.Hours() / 24)
+			if integration.ResultTTLDays <= 0 {
+				integration.ResultTTLDays = 1
+			}
+		} else if days, err := strconv.Atoi(value); err == nil && days > 0 {
+			integration.ResultTTLDays = days
+		}
 	}
 }
 
@@ -636,6 +803,7 @@ func LoadConfig() (*Config, error) {
 	applyNetworkEnvOverrides()
 	applyAuthAndTenantDefaults(&cfg)
 	applyAuditDefaults(&cfg)
+	applyIntegrationDefaults(&cfg)
 
 	if err := ValidateConfig(&cfg); err != nil {
 		return nil, err
