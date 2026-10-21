@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "protocol": "sdd-solo@1",
+  "demandId": "OPC-INTEGRATION-001",
+  "deliveryMode": "full",
+  "exportedAt": "2026-10-21T19:07:05+08:00",
+  "snapshotReadonly": true,
+  "repository": {
+    "repositoryId": "knowledge-opc",
+    "remote": "https://github.com/Roger0808/OPC-2.0.git"
+  },
+  "authority": {
+    "remote": "https://github.com/Roger0808/work-opc.git",
+    "commit": "3011e55004007f8eaca34b65aba4506be8a5dd49",
+    "requirementsSha256": "sha256:9c63a8c01548da0c573c166e3eb64a9bcd7433b770da35bb69f1f6ea7761cac9"
+  },
+  "requirementsPath": "docs/loops/demands/OPC-INTEGRATION-001/loop-1/requirements.md",
+  "files": {
+    "requirements.md": "sha256:9c63a8c01548da0c573c166e3eb64a9bcd7433b770da35bb69f1f6ea7761cac9",
+    "contracts.md": "sha256:404e3eb9d7a3b55e785beb827fdceec301a713a6ef4200ca3245dfff000e4054",
+    "dependencies.md": "sha256:a3c2575c704c7c68ba50b323b24bdacc26cc2fda0dd7a462001656d1789c2bf1",
+    "repository/tasks.md": "sha256:5d1179e157b819ed0b8a15e65fcbfca63c82c653e88bb4a6fa873cd7001b99b9",
+    "repository/implementation.md": "sha256:c73f1dd26434aced4020dc0c476ca11680c2ac45caa046f09646e2c8f30b41e9",
+    "repository/verification.md": "sha256:b01f8e4ecf8c30ecd6cc90a2c0cced932cbffe0724f723aef836c17dc6ff2f66",
+    "repository/review.md": "sha256:00f9e6d986b1257e8e64d5652a24beec224820d58e77cc953e66d4d916e211b9",
+    "repository/repository-receipt.json": "sha256:33476b7881e34f1c331970059f63f5dd11d224e2945aa308c3af48656bb3e9d9"
+  }
+}
