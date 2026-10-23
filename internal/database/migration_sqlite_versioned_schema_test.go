@@ -15,7 +15,9 @@ import (
 // create to stay in sync with the versioned (PostgreSQL) migrations:
 // 000041 task queue, 000053 system settings, 000055 processing spans,
 // 000063 knowledge multi-tags, 000093 browser authorization, 000103 message
-// artifacts.
+// artifacts. skill_release is deliberately absent: versioned 000133 /
+// sqlite 000047 (WORK-RESOURCES-001) drop it again, so a fresh migrated
+// database no longer contains the legacy release ledger.
 var versionedSQLiteTables = []string{
 	"memory_extraction_sessions",
 	"task_pending_ops",
@@ -43,7 +45,6 @@ var versionedSQLiteTables = []string{
 	"automations",
 	"automation_runs",
 	"notifications",
-	"skill_release",
 	"mcp_invocations",
 	"mcp_invocation_decisions",
 }
@@ -83,7 +84,7 @@ var versionedSQLiteColumns = map[string][]string{
 	}, // 000028
 }
 
-const expectedSQLiteMigrationVersion = 46
+const expectedSQLiteMigrationVersion = 47
 
 func TestSQLiteMigrationsCreateVersionedSchema(t *testing.T) {
 	repoRoot := sqliteRepoRoot(t)

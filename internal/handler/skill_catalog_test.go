@@ -26,6 +26,20 @@ type fakeSkillCatalog struct {
 	deleteErr    error
 	source       string
 	installCalls int
+	archive      *service.CatalogArchive
+	archiveErr   error
+	archiveCalls int
+	gotCatalogID string
+	gotExpected  string
+}
+
+func (f *fakeSkillCatalog) OpenCatalogArchive(
+	_ context.Context, _ uint64, catalogID, expectedSHA256 string,
+) (*service.CatalogArchive, error) {
+	f.archiveCalls++
+	f.gotCatalogID = catalogID
+	f.gotExpected = expectedSHA256
+	return f.archive, f.archiveErr
 }
 
 func (f *fakeSkillCatalog) ListCatalog(context.Context, uint64) ([]service.SkillCatalogView, error) {

@@ -7170,6 +7170,8 @@ export default {
       servedAfterFailure: 'Обновление не удалось; работает {version}',
       servedAfterFailurePlain: 'Обновление не удалось; работает предыдущая версия',
       loadFailed: 'Не удалось загрузить',
+      deepLinkNotFound: 'Целевой навык не найден: он мог быть удалён или недоступен этой учётной записи',
+      deepLinkTenantForbidden: 'Эта учётная запись не является участником целевого пространства, навык нельзя открыть',
     },
     mcpService: 'Сервис MCP',
     versionInfo: 'Информация о версии',

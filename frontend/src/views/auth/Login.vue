@@ -326,6 +326,7 @@ import { useRoleLabel } from '@/composables/useRoleLabel'
 import { notifyLoginSuccess } from '@/utils/loginNotify'
 import { canRegister } from './registrationPolicy'
 import { newPasswordRules } from '@/utils/passwordPolicy'
+import { safeLoginRedirect } from '@/utils/resourceDeepLink'
 import { Swiper, SwiperSlide } from 'swiper/vue'
 import { Autoplay, EffectFade, Pagination } from 'swiper/modules'
 import 'swiper/css'
@@ -575,6 +576,16 @@ const persistLoginResponse = async (response: any, skipRedirect = false) => {
   await authStore.refreshFromAuthMe()
   await nextTick()
   if (skipRedirect) return
+  // A guarded visit carried a same-origin platform target (skill detail by
+  // catalog_id, KB detail, reference links); honor it after login so the
+  // user lands back on the resource they asked for. Anything unsafe was
+  // already filtered by the router, but the guard here is the last line of
+  // defense against an injected redirect parameter.
+  const redirectTarget = safeLoginRedirect(route.query.redirect)
+  if (redirectTarget && authStore.hasValidTenant) {
+    router.replace(redirectTarget)
+    return
+  }
   router.replace(authStore.hasValidTenant ? '/platform/knowledge-bases' : '/onboarding/workspace')
 }
 

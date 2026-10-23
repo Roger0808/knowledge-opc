@@ -340,6 +340,7 @@ func (f *installFixture) storeSkillBundle(t *testing.T, skillID string, archive 
 	require.NoError(t, err)
 	require.NotNil(t, skill)
 	skill.BundleRef = "file://bundle.zip"
+	skill.BundleSHA256 = skillArchiveSHA256(archive)
 	skill.Status = types.SkillStatusReady
 	require.NoError(t, f.skillRepo.UpdateSkill(ctx, skill))
 	if f.storedBundles == nil {

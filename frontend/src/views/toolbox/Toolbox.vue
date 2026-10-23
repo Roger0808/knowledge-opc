@@ -107,10 +107,19 @@ const select = (section: ToolboxSection) => {
 }
 
 // The bare /toolbox URL, and tools lost to a role or workspace switch, land on
-// the first tool the user can still open.
+// the first tool the user can still open. A skill deep link
+// (?catalog_id=...) prefers the skills tab so the target can resolve there.
 watch([selectedItem, visibleItems], () => {
+  if (selectedItem.value) return
   const fallback = visibleItems.value[0]
-  if (!selectedItem.value && fallback) void router.replace(toolboxLocation(fallback.key))
+  if (!fallback) return
+  const deepLink = route.query.catalog_id
+  const skills = visibleItems.value.find((item) => item.key === 'skills')
+  if (typeof deepLink === 'string' && deepLink && skills) {
+    void router.replace(toolboxLocation(skills.key))
+    return
+  }
+  void router.replace(toolboxLocation(fallback.key))
 }, { immediate: true })
 
 // Tab badges for tools that are not open; the open panel keeps its own badge current.

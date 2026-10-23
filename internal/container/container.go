@@ -188,7 +188,6 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Provide(repository.NewMCPOAuthRepository))
 	must(container.Provide(repository.NewTenantSandboxConfigRepository))
 	must(container.Provide(repository.NewTenantSkillRepository))
-	must(container.Provide(repository.NewSkillReleaseRepository))
 	must(container.Provide(repository.NewCustomAgentRepository))
 	must(container.Provide(repository.NewOrganizationRepository))
 	must(container.Provide(repository.NewKBShareRepository))
@@ -416,15 +415,11 @@ func BuildContainer(container *dig.Container) *dig.Container {
 		streams interfaces.StreamManager,
 		messages interfaces.MessageRepository,
 		host service.HostSandboxManager,
-		releaseRepo repository.SkillReleaseRepository,
 	) *service.TenantSkillService {
 		svc := service.NewTenantSkillService(
 			skillsRepo, configsRepo, resolver, sandboxes, sandboxPolicy, agents,
 			customAgents, sessions, models, redisClient, streams, messages, host,
 		)
-		// DeleteCatalog refuses to drop archive bytes a published release
-		// still references (EXT-001).
-		svc.SetSkillReleaseRepository(releaseRepo)
 		return svc
 	}))
 	// The member-facing half of env vars is its own service because its
@@ -712,10 +707,6 @@ func BuildContainer(container *dig.Container) *dig.Container {
 		s *service.TenantSkillService, agents interfaces.AgentShareService,
 	) *handler.SkillHandler {
 		return handler.NewSkillHandler(s, s, agents)
-	}))
-	must(container.Provide(service.NewSkillReleaseService))
-	must(container.Provide(func(releases *service.SkillReleaseService) *handler.SkillReleaseHandler {
-		return handler.NewSkillReleaseHandler(releases)
 	}))
 	must(container.Provide(handler.NewOrganizationHandler))
 	must(container.Provide(handler.NewMemoryHandler))

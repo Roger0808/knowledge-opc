@@ -383,7 +383,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { AddIcon, DeleteIcon, FolderIcon } from 'tdesign-icons-vue-next'
 import { useI18n } from 'vue-i18n'
@@ -395,6 +396,8 @@ import ModelSelector from '@/components/ModelSelector.vue'
 import { useConfirmDelete } from '@/components/settings/useConfirmDelete'
 import { useConfigSkillInstallProgress } from '@/composables/useConfigSkillInstallProgress'
 import { matchesResourceQuery } from '@/utils/resourceListSearch'
+import { parseSkillDeepLink } from '@/utils/resourceDeepLink'
+import { useAuthStore } from '@/stores/auth'
 import { SKILL_ICON } from '@/types/mention'
 import { useUIStore } from '@/stores/ui'
 import { useDeploymentCapabilitiesStore } from '@/stores/deploymentCapabilities'
@@ -454,6 +457,12 @@ const catalog = ref<SkillCatalogItem[]>([])
 const query = ref('')
 const filteredCatalog = computed(() => catalog.value.filter((item) => matchesResourceQuery(item, query.value)))
 const focusedCatalogId = ref('')
+const route = useRoute()
+const authStore = useAuthStore()
+// WORK-RESOURCES-001 (BND-003): /platform/toolbox/skills?catalog_id=... opens
+// exactly that catalog entry. The flag makes the deep link resolve once per
+// target change instead of re-firing on every silent catalog poll.
+const deepLinkConsumedFor = ref('')
 const deletingId = ref('')
 const showAdd = ref(false)
 const showInstall = ref(false)
@@ -979,6 +988,11 @@ function defaultAddTargets(): string[] {
 
 function revealCatalog(id: string) {
   focusedCatalogId.value = id
+  // A deep-link arrival scrolls the highlighted card into view once the
+  // focus class renders.
+  void nextTick(() => {
+    document.querySelector('.skill-card--focused')?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  })
   if (focusTimer != null) window.clearTimeout(focusTimer)
   focusTimer = window.setTimeout(() => {
     if (focusedCatalogId.value === id) focusedCatalogId.value = ''
@@ -1276,12 +1290,66 @@ async function loadCatalog(silent = false) {
     const res = await listSkillCatalog()
     catalog.value = res?.data || []
     emit('count', catalog.value.length)
+    resolveSkillDeepLink()
   } catch (e: any) {
     if (!silent) MessagePlugin.error(e?.message || t('settings.skills.loadFailed'))
   } finally {
     ensurePoll()
   }
 }
+
+// resolveSkillDeepLink opens the catalog entry named by ?catalog_id= exactly:
+// an id match reveals and scrolls to that card, an unknown id fails loudly
+// instead of substituting a same-named skill, and an unknown or unparseable
+// target leaves the plain skills page untouched. tenant_id only switches the
+// active workspace after a membership check — it is never an authorization
+// grant (BND-003).
+function resolveSkillDeepLink() {
+  const target = parseSkillDeepLink(route.query as Record<string, unknown>)
+  if (!target) {
+    deepLinkConsumedFor.value = ''
+    return
+  }
+  const key = `${target.tenantId ?? ''}:${target.catalogId}`
+  if (deepLinkConsumedFor.value === key) return
+
+  if (target.tenantId !== null) {
+    const current = authStore.getSelectedTenant()
+      ?? (authStore.currentTenantId ? Number(authStore.currentTenantId) : null)
+    if (current !== target.tenantId) {
+      const membership = authStore.memberships.find((m) => m.tenant_id === target.tenantId)
+      if (!membership) {
+        deepLinkConsumedFor.value = key
+        MessagePlugin.error(t('settings.skills.deepLinkTenantForbidden'))
+        return
+      }
+      authStore.setSelectedTenant(target.tenantId, membership.tenant_name ?? null)
+      // The catalog below belongs to the switched workspace; reloading it
+      // re-enters this resolver, and the membership check now short-
+      // circuits so the reveal happens exactly once in the new space.
+      void loadCatalog()
+      return
+    }
+  }
+
+  deepLinkConsumedFor.value = key
+  const hit = catalog.value.find((item) => item.id === target.catalogId)
+  if (!hit) {
+    // 目标不存在或不可见：明确失败，不按同名替代（VAL-204）。
+    MessagePlugin.error(t('settings.skills.deepLinkNotFound'))
+    return
+  }
+  query.value = ''
+  revealCatalog(hit.id)
+}
+
+watch(
+  () => route.query.catalog_id,
+  () => {
+    deepLinkConsumedFor.value = ''
+    resolveSkillDeepLink()
+  },
+)
 
 async function load() {
   loading.value = true

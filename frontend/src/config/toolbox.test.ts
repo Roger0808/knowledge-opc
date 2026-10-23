@@ -95,6 +95,9 @@ test('settings no longer render moved panels, and old bookmarks reach toolbox', 
   assert.match(router, /to\.path === '\/platform\/settings' && isToolboxSection\(to\.query\.section\)/)
   assert.match(router, /toolboxLocation\(to\.query\.section/)
   const page = readFileSync(new URL('../views/toolbox/Toolbox.vue', import.meta.url), 'utf8')
-  assert.match(page, /if \(!selectedItem\.value && fallback\) void router\.replace\(toolboxLocation\(fallback\.key\)\)/)
+  // The fallback watcher routes to the first reachable tool; a skill deep
+  // link (?catalog_id=...) prefers the skills tab so the target resolves.
+  assert.match(page, /if \(typeof deepLink === 'string' && deepLink && skills\)/)
+  assert.match(page, /void router\.replace\(toolboxLocation\(fallback\.key\)\)/)
   assert.match(page, /:key="sandboxId"\s+:initial-sandbox-id="sandboxId"/)
 })

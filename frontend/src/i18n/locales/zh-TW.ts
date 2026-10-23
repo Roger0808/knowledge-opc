@@ -7171,6 +7171,8 @@ export default {
       servedAfterFailure: '升級失敗，仍在使用 {version}',
       servedAfterFailurePlain: '升級失敗，仍在使用舊版本',
       loadFailed: '載入失敗',
+      deepLinkNotFound: '找不到目標技能，可能已刪除或目前帳號無權存取',
+      deepLinkTenantForbidden: '目前帳號不是目標空間的成員，無法開啟該技能',
     },
     mcpService: 'MCP服務',
     versionInfo: '版本資訊',

@@ -2201,6 +2201,8 @@ export default {
       servedAfterFailure: 'Upgrade failed; still running {version}',
       servedAfterFailurePlain: 'Upgrade failed; still running the previous version',
       loadFailed: 'Failed to load',
+      deepLinkNotFound: 'Target skill not found; it may have been deleted or is not accessible to this account',
+      deepLinkTenantForbidden: 'This account is not a member of the target workspace, so the skill cannot be opened',
     },
     mcpService: 'MCP Service',
     versionInfo: 'Version Info',
