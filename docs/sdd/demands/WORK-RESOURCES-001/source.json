@@ -1,22 +1,25 @@
 {
-  "schema": "sdd-trace-export/v1",
-  "deliveryMode": "full",
+  "schemaVersion": 1,
+  "protocol": "sdd-solo@1",
   "demandId": "WORK-RESOURCES-001",
+  "deliveryMode": "full",
+  "repository": {
+    "repositoryId": "knowledge-opc",
+    "remote": "https://github.com/Roger0808/OPC-2.0.git"
+  },
   "authority": {
     "remote": "https://github.com/Roger0808/work-opc.git",
-    "commit": "ba1211aa77b16ce25770b16a532d67d0f5985358"
+    "commit": "ba1211aa77b16ce25770b16a532d67d0f5985358",
+    "requirementsSha256": "sha256:bfb4eb8234de5584bb338293736dd8100f4acb65cebb987ba3515a86fbc4e484"
   },
-  "requirementsPath": "docs/loops/demands/WORK-RESOURCES-001/loop-1/requirements.md",
-  "requirementsSha256": "bfb4eb8234de5584bb338293736dd8100f4acb65cebb987ba3515a86fbc4e484",
-  "exportedAt": "2026-10-23T05:13:45Z",
   "files": {
-    "contracts.md": "625a218f75473e20ccd3f1b7d4a61b551f20d49858c15dc85947eb738dc85dd3",
-    "dependencies.md": "c82d68b764763f9d93316b455c776c537d90e3ad5258f58414942e41aca34ce0",
-    "repository/implementation.md": "9b9aa66c57974882320db7eb0c2e98bb5357bbb91acd8bdadd1ecddb949a9da5",
-    "repository/repository-receipt.json": "99b6c139e5d95514b9950a684bb8d0557989a7ad8bf1b77a1c4d2a1069e36d49",
-    "repository/review.md": "4086c699bed9fd870618b742bdd4f3e530116f005f46934ed1937bc6a894c5a8",
-    "repository/tasks.md": "ce6373f9ff9a02aedb82857e8fa41b62d331b10dcacff98d410729172edf2739",
-    "repository/verification.md": "56cddcfd011bb494c848c68b95ea270d42b4c8682e498ff4826a4bef71fd74e7",
-    "requirements.md": "2acbe6d98e2f190132af9463ddd4200e20da65c3143c61a61981730dfe178347"
+    "requirements.md": "sha256:bfb4eb8234de5584bb338293736dd8100f4acb65cebb987ba3515a86fbc4e484",
+    "contracts.md": "sha256:625a218f75473e20ccd3f1b7d4a61b551f20d49858c15dc85947eb738dc85dd3",
+    "dependencies.md": "sha256:c82d68b764763f9d93316b455c776c537d90e3ad5258f58414942e41aca34ce0",
+    "repository/tasks.md": "sha256:ce6373f9ff9a02aedb82857e8fa41b62d331b10dcacff98d410729172edf2739",
+    "repository/implementation.md": "sha256:9b9aa66c57974882320db7eb0c2e98bb5357bbb91acd8bdadd1ecddb949a9da5",
+    "repository/verification.md": "sha256:56cddcfd011bb494c848c68b95ea270d42b4c8682e498ff4826a4bef71fd74e7",
+    "repository/review.md": "sha256:4086c699bed9fd870618b742bdd4f3e530116f005f46934ed1937bc6a894c5a8",
+    "repository/repository-receipt.json": "sha256:99b6c139e5d95514b9950a684bb8d0557989a7ad8bf1b77a1c4d2a1069e36d49"
   }
 }
