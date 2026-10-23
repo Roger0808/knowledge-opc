@@ -2201,6 +2201,8 @@ export default {
       servedAfterFailure: 'アップグレード失敗。{version} を使用中',
       servedAfterFailurePlain: 'アップグレード失敗。以前のバージョンを使用中',
       loadFailed: '読み込みに失敗しました',
+      deepLinkNotFound: '対象のスキルが見つかりません。削除されたか、このアカウントからはアクセスできません',
+      deepLinkTenantForbidden: 'このアカウントは対象ワークスペースのメンバーではないため、そのスキルを開けません',
     },
     mcpService: 'MCPサービス',
     versionInfo: 'バージョン情報',

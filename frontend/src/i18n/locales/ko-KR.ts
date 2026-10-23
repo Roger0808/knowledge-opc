@@ -7170,6 +7170,8 @@ export default {
       servedAfterFailure: '업그레이드 실패, {version} 사용 중',
       servedAfterFailurePlain: '업그레이드 실패, 이전 버전 사용 중',
       loadFailed: '불러오지 못했습니다',
+      deepLinkNotFound: '대상 스킬을 찾을 수 없습니다. 삭제되었거나 이 계정에서 접근할 수 없습니다',
+      deepLinkTenantForbidden: '이 계정은 대상 워크스페이스의 멤버가 아니므로 해당 스킬을 열 수 없습니다',
     },
     mcpService: 'MCP 서비스',
     versionInfo: '버전 정보',

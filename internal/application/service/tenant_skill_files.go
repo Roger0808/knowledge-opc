@@ -104,7 +104,8 @@ func (s *TenantSkillService) skillBundleArchive(
 		return nil, apperrors.NewNotFoundError("skill not found")
 	}
 	// An object named by the row itself is the archive this sandbox was built
-	// from, so it answers first and needs no digest check.
+	// from, so it answers first. Cache entries are digest-verified when they
+	// are written (see trySkillBundle), so a cache hit is safe to trust.
 	if archive, ok := s.trySkillBundle(ctx, tenantID, skill); ok {
 		return archive, nil
 	}
@@ -160,6 +161,20 @@ func (s *TenantSkillService) sameDigestCatalogArchive(
 	return archive, nil
 }
 
+// errSkillBundleDigestMismatch marks a download whose bytes do not hash to
+// the digest the cache key names. It never escapes trySkillBundle: the
+// function answers (nil, false) like any other failed fetch, so callers fall
+// back to their digest-verified paths or an honest failure. It exists so the
+// cache write below can tell a version race from a storage outage.
+var errSkillBundleDigestMismatch = errors.New("skill bundle digest does not match the cache key")
+
+// trySkillBundle fetches the archive one skill row names, caching it by
+// tenant and digest. A cache hit is trusted without re-hashing, so a cached
+// entry must never pin bytes under a digest they do not hash to: a racing
+// re-register can replace the object the reference names between the row
+// read and the download, and serving that poisoned entry later would hand
+// the wrong version's tree to installs pinned to the old digest. Bytes that
+// fail the check are returned to no one and cached nowhere.
 func (s *TenantSkillService) trySkillBundle(
 	ctx context.Context, tenantID uint64, skill *types.TenantSkillEntity,
 ) ([]byte, bool) {
@@ -177,6 +192,10 @@ func (s *TenantSkillService) trySkillBundle(
 		archive, err := s.downloadSkillBundle(ctx, tenantID, skill)
 		if err != nil {
 			return nil, err
+		}
+		if want := strings.TrimSpace(skill.BundleSHA256); want != "" &&
+			!archiveMatchesSHA(archive, want) {
+			return nil, errSkillBundleDigestMismatch
 		}
 		s.storeSkillBundle(key, archive)
 		return archive, nil

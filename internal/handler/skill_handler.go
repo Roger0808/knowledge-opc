@@ -39,6 +39,9 @@ type skillCatalogService interface {
 	DeleteCatalog(ctx context.Context, tenantID uint64, catalogID string) error
 	ListCatalogFiles(ctx context.Context, tenantID uint64, catalogID string) ([]service.SkillFileEntry, error)
 	ReadCatalogFile(ctx context.Context, tenantID uint64, catalogID, relativePath string) (*service.SkillFileContent, error)
+	// OpenCatalogArchive returns the authoritative original archive bytes of
+	// one live catalog definition, strictly resolved by (tenant, catalog id).
+	OpenCatalogArchive(ctx context.Context, tenantID uint64, catalogID, expectedSHA256 string) (*service.CatalogArchive, error)
 }
 
 // NewSkillHandler creates a new skill handler. catalog may be nil in tests

@@ -38,6 +38,16 @@ async function fixture(initial: SkillCatalogItem[], host = false) {
   const mocks: Record<string, unknown> = {
     'vue': require('vue'),
     'vue-i18n': { useI18n: () => ({ t: (key: string) => key, te: () => false }) },
+    'vue-router': { useRoute: () => ({ query: {} }) },
+    '@/stores/auth': {
+      useAuthStore: () => ({
+        getSelectedTenant: () => null,
+        currentTenantId: '',
+        memberships: [],
+        setSelectedTenant() {},
+      }),
+    },
+    '@/utils/resourceDeepLink': { parseSkillDeepLink: () => null },
     'tdesign-vue-next': { MessagePlugin: { error: assert.fail } },
     '@/stores/ui': { useUIStore: () => ({}) },
     '@/stores/deploymentCapabilities': {

@@ -8,6 +8,7 @@ import type { DeploymentCapabilityKey } from '@/config/deploymentCapabilities'
 import { MessagePlugin } from 'tdesign-vue-next'
 import i18n from '@/i18n'
 import { normalizeSettingsSection } from '@/config/settingsRoute'
+import { safeLoginRedirect } from '@/utils/resourceDeepLink'
 import { isToolboxSection, toolboxLocation } from '@/config/toolbox'
 
 /** Lite /桌面 WebView 硬刷新时可能只打开 `/`，用 session 记住上次页面以便恢复 */
@@ -321,7 +322,7 @@ router.beforeEach(async (to, from, next) => {
     if (!authStore.isLoggedIn) {
       const restored = await hydrateSessionFromToken(authStore)
       if (!restored) {
-        next('/login')
+        next(loginRedirectLocation(to))
         return
       }
     }
@@ -372,7 +373,7 @@ router.beforeEach(async (to, from, next) => {
           // Auto-setup may be unavailable outside the native Lite shell.
         }
       }
-      next('/login')
+      next(loginRedirectLocation(to))
       return
     }
   }
@@ -406,6 +407,16 @@ router.beforeEach(async (to, from, next) => {
 
   next()
 })
+
+// An unauthenticated visit to a platform deep link (skill detail by
+// catalog_id, KB detail by id, reference targets) bounces to /login but
+// keeps the same-origin target, so a successful login returns to it. Only
+// platform-internal relative paths are honored — hostile or external return
+// URLs fall back to the plain login page (BND-003).
+function loginRedirectLocation(to: RouteLocationNormalized) {
+  const target = safeLoginRedirect(to.fullPath)
+  return target && target !== '/login' ? { path: '/login', query: { redirect: target } } : '/login'
+}
 
 router.afterEach((to) => {
   if (!isLiteEdition(useAuthStore())) return

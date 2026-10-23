@@ -446,7 +446,7 @@ func TestSkillCatalogWriteRoutesRequireFullAccess(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	g := &rbacGuards{}
 	v1 := gin.New().Group("/api/v1")
-	RegisterSkillRoutes(v1, &handler.SkillHandler{}, &handler.SkillReleaseHandler{}, g)
+	RegisterSkillRoutes(v1, &handler.SkillHandler{}, g)
 
 	cases := []struct {
 		method string
@@ -454,7 +454,6 @@ func TestSkillCatalogWriteRoutesRequireFullAccess(t *testing.T) {
 	}{
 		{http.MethodPost, "/api/v1/skills/catalog"},
 		{http.MethodPost, "/api/v1/skills/catalog/:id/install"},
-		{http.MethodPost, "/api/v1/skills/catalog/:id/publish"},
 		{http.MethodGet, "/api/v1/skills/catalog/:id/files"},
 		{http.MethodGet, "/api/v1/skills/catalog/:id/files/content"},
 		{http.MethodDelete, "/api/v1/skills/catalog/:id"},
